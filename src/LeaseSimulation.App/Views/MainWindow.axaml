@@ -18,7 +18,7 @@
             <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="30">
                 <StackPanel Spacing="2">
                     <TextBlock Text="WINDOWS FABRIC" Foreground="#78D8C2" FontSize="11" FontWeight="SemiBold" />
-                    <TextBlock Text="Lease Lab" Foreground="White" FontSize="25" FontWeight="SemiBold" />
+                    <TextBlock Text="Lease Playground" Foreground="White" FontSize="25" FontWeight="SemiBold" />
                 </StackPanel>
                 <StackPanel Grid.Column="1">
                     <TextBlock Text="SIMULATION TIME" Foreground="#93A09C" FontSize="10" />

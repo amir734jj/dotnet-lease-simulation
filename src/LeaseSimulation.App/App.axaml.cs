@@ -20,7 +20,7 @@ public partial class App : Application
         {
             desktop.MainWindow = new Window
             {
-                Title = "Windows Fabric Lease Lab",
+                Title = "Windows Fabric Lease Playground",
                 Width = 1280,
                 Height = 800,
                 MinWidth = 1050,
