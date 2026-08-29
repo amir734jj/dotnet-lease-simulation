@@ -187,6 +187,42 @@ public sealed class LeaseClusterSimulatorTests
     }
 
     [Fact]
+    public void NetworkPartition_FencesMinoritySideAfterArbitration_AndHealingRestoresIt()
+    {
+        var simulator = CreateSimulator(nodeCount: 7, neighborhoodSize: 1, arbitrationDuration: TimeSpan.FromSeconds(2));
+
+        simulator.StartNetworkPartition(3);
+        simulator.AdvanceBy(TimeSpan.FromMilliseconds(11_999));
+
+        Assert.All(simulator.Nodes, node => Assert.True(node.IsRunning));
+
+        simulator.AdvanceBy(TimeSpan.FromMilliseconds(1));
+
+        Assert.All(simulator.Nodes.Where(node => node.Id <= 3), node => Assert.True(node.IsRunning));
+        Assert.All(simulator.Nodes.Where(node => node.Id > 3), node => Assert.False(node.IsRunning));
+        Assert.Equal([0, 1, 2, 3], simulator.Topology.MemberIds);
+
+        simulator.HealNetworkPartition();
+
+        Assert.False(simulator.IsNetworkPartitioned);
+        Assert.All(simulator.Nodes, node => Assert.True(node.IsRunning));
+        Assert.Equal(Enumerable.Range(0, 7), simulator.Topology.MemberIds);
+    }
+
+    [Fact]
+    public void EvenNetworkPartition_FencesBothSidesWithoutVoterQuorum()
+    {
+        var simulator = CreateSimulator(nodeCount: 6, neighborhoodSize: 1, arbitrationDuration: TimeSpan.FromSeconds(2));
+
+        simulator.StartNetworkPartition(2);
+        simulator.AdvanceBy(TimeSpan.FromSeconds(12));
+
+        Assert.All(simulator.Nodes, node => Assert.False(node.IsRunning));
+        Assert.Empty(simulator.Topology.MemberIds);
+        Assert.Contains(simulator.Events, item => item.Message.Contains("surviving side none"));
+    }
+
+    [Fact]
     public void InvalidConfiguration_IsRejectedAtConstruction()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => new LeaseClusterSimulator(new() { NodeCount = 1 }));

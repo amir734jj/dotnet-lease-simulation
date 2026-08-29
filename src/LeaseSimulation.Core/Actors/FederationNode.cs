@@ -99,27 +99,38 @@ internal sealed class FederationNode(int id) : IFederationNodeActor
     public IReadOnlyList<NodeLeaseOutcome> ProcessDueTransitions(
         TimeSpan now,
         LeaseSimulationOptions options,
-        Func<int, IFederationNodeActor> resolveNode)
+        Func<int, IFederationNodeActor> resolveNode,
+        Func<int, int, bool> canCommunicate,
+        Func<int, int, TimeSpan?> getCommunicationFailureTime)
     {
         var outcomes = new List<NodeLeaseOutcome>();
         foreach (var lease in outgoingLeases.ToArray())
         {
+            var target = resolveNode(lease.TargetId);
+            var isReachable = canCommunicate(Id, lease.TargetId);
             if (lease.Status is LeaseStatus.Active or LeaseStatus.Renewing)
             {
                 if (lease.NextRenewAt <= now && lease.NextRenewAt < lease.ExpiresAt)
                 {
-                    ProcessRenewal(lease, now, options, resolveNode(lease.TargetId), outcomes);
+                    ProcessRenewal(lease, now, options, target, isReachable, outcomes);
                 }
 
                 if (lease.ExpiresAt <= now)
                 {
-                    ProcessExpiration(lease, now, options, resolveNode(lease.TargetId), outcomes);
+                    ProcessExpiration(
+                        lease,
+                        now,
+                        options,
+                        target,
+                        isReachable,
+                        getCommunicationFailureTime(Id, lease.TargetId),
+                        outcomes);
                 }
             }
 
             if (lease.Status == LeaseStatus.Arbitrating && lease.ArbitrationEndsAt <= now)
             {
-                CompleteArbitration(lease, now, options, resolveNode(lease.TargetId), outcomes);
+                CompleteArbitration(lease, now, options, target, isReachable, outcomes);
             }
         }
 
@@ -139,9 +150,10 @@ internal sealed class FederationNode(int id) : IFederationNodeActor
         TimeSpan now,
         LeaseSimulationOptions options,
         IFederationNodeActor target,
+        bool isReachable,
         ICollection<NodeLeaseOutcome> outcomes)
     {
-        if (IsRunning && target.IsRunning)
+        if (IsRunning && target.IsRunning && isReachable)
         {
             lease.Handle(LeaseEvent.RenewalSucceeded, CreateTransitionContext(now, options));
             return;
@@ -158,6 +170,8 @@ internal sealed class FederationNode(int id) : IFederationNodeActor
         TimeSpan now,
         LeaseSimulationOptions options,
         IFederationNodeActor target,
+        bool isReachable,
+        TimeSpan? communicationFailureTime,
         ICollection<NodeLeaseOutcome> outcomes)
     {
         if (!IsRunning)
@@ -166,7 +180,7 @@ internal sealed class FederationNode(int id) : IFederationNodeActor
             return;
         }
 
-        if (target.IsRunning)
+        if (target.IsRunning && isReachable)
         {
             lease.Handle(LeaseEvent.TargetRecovered, CreateTransitionContext(now, options));
             return;
@@ -175,10 +189,11 @@ internal sealed class FederationNode(int id) : IFederationNodeActor
         Dispatch(
             lease.Handle(LeaseEvent.TtlExpired, CreateTransitionContext(now, options)),
             target,
-            outcomes);
+            outcomes,
+            target.CrashedAt ?? communicationFailureTime);
         if (!options.ArbitrationEnabled || options.ArbitrationDuration == TimeSpan.Zero)
         {
-            CompleteArbitration(lease, now, options, target, outcomes);
+            CompleteArbitration(lease, now, options, target, isReachable, outcomes);
         }
     }
 
@@ -187,6 +202,7 @@ internal sealed class FederationNode(int id) : IFederationNodeActor
         TimeSpan now,
         LeaseSimulationOptions options,
         IFederationNodeActor target,
+        bool isReachable,
         ICollection<NodeLeaseOutcome> outcomes)
     {
         if (lease.Status == LeaseStatus.Down)
@@ -194,7 +210,7 @@ internal sealed class FederationNode(int id) : IFederationNodeActor
             return;
         }
 
-        if (target.IsRunning)
+        if (target.IsRunning && isReachable)
         {
             Dispatch(
                 lease.Handle(LeaseEvent.TargetRecovered, CreateTransitionContext(now, options)),
@@ -212,7 +228,8 @@ internal sealed class FederationNode(int id) : IFederationNodeActor
     private void Dispatch(
         LeaseTransitionResult result,
         IFederationNodeActor target,
-        ICollection<NodeLeaseOutcome> outcomes)
+        ICollection<NodeLeaseOutcome> outcomes,
+        TimeSpan? failureStartedAt = null)
     {
         var outcome = result switch
         {
@@ -220,7 +237,7 @@ internal sealed class FederationNode(int id) : IFederationNodeActor
             LeaseTransitionResult.RenewalTimedOut => new NodeLeaseOutcome(
                 NodeLeaseOutcomeKind.RenewalTimedOut, Id, target.Id),
             LeaseTransitionResult.FailureSuspected => new NodeLeaseOutcome(
-                NodeLeaseOutcomeKind.FailureSuspected, Id, target.Id, target.CrashedAt),
+                NodeLeaseOutcomeKind.FailureSuspected, Id, target.Id, failureStartedAt ?? target.CrashedAt),
             LeaseTransitionResult.FailureCancelled => new NodeLeaseOutcome(
                 NodeLeaseOutcomeKind.FailureCancelled, Id, target.Id),
             LeaseTransitionResult.FailureConfirmed => new NodeLeaseOutcome(

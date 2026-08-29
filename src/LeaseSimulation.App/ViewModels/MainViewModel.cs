@@ -35,6 +35,9 @@ public partial class MainViewModel : ViewModelBase
     public partial double ArbitrationSeconds { get; set; } = 30;
 
     [ObservableProperty]
+    public partial int FirstPartitionSize { get; set; } = 6;
+
+    [ObservableProperty]
     public partial double Speed { get; set; } = 10;
 
     [ObservableProperty]
@@ -70,6 +73,9 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     public partial string RingPathText { get; set; } = string.Empty;
 
+    [ObservableProperty]
+    public partial string EventLogText { get; set; } = string.Empty;
+
     private readonly DispatcherTimer timer;
     private ILeaseClusterSimulator simulator = null!;
     private int displayedEventCount;
@@ -87,6 +93,8 @@ public partial class MainViewModel : ViewModelBase
     public string RunButtonText => IsRunning ? "Pause" : "Run";
     public string SpeedText => $"{Speed:0}x";
     public double RenewStartsAt => LeaseSeconds / RenewRatio;
+    public int PartitionMaximum => Math.Max(1, NodeCount - 1);
+    public string PartitionButtonText => simulator?.IsNetworkPartitioned == true ? "Heal partition" : "Start partition";
 
     [RelayCommand]
     private void ToggleRun()
@@ -107,6 +115,7 @@ public partial class MainViewModel : ViewModelBase
     {
         IsRunning = false;
         NeighborhoodSize = Math.Min(NeighborhoodSize, NodeCount - 1);
+        FirstPartitionSize = Math.Clamp(FirstPartitionSize, 1, PartitionMaximum);
         simulator = new LeaseClusterSimulator(new LeaseSimulationOptions
         {
             NodeCount = NodeCount,
@@ -120,6 +129,23 @@ public partial class MainViewModel : ViewModelBase
         displayedEventCount = 0;
         EventRows.Clear();
         OnPropertyChanged(nameof(RunButtonText));
+        OnPropertyChanged(nameof(PartitionButtonText));
+        Refresh();
+    }
+
+    [RelayCommand]
+    private void TogglePartition()
+    {
+        if (simulator.IsNetworkPartitioned)
+        {
+            simulator.HealNetworkPartition();
+        }
+        else
+        {
+            simulator.StartNetworkPartition(FirstPartitionSize - 1);
+        }
+
+        OnPropertyChanged(nameof(PartitionButtonText));
         Refresh();
     }
 
@@ -154,6 +180,12 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(RenewStartsAt));
     }
 
+    partial void OnNodeCountChanged(int value)
+    {
+        OnPropertyChanged(nameof(PartitionMaximum));
+        FirstPartitionSize = Math.Clamp(FirstPartitionSize, 1, PartitionMaximum);
+    }
+
     private void Tick()
     {
         if (!IsRunning)
@@ -185,6 +217,10 @@ public partial class MainViewModel : ViewModelBase
         {
             EventRows.RemoveAt(EventRows.Count - 1);
         }
+
+        EventLogText = string.Join(
+            Environment.NewLine,
+            EventRows.Select(row => $"{row.Time}  {row.Message}"));
 
         var detections = simulator.Detections;
         ElapsedText = FormatTime(simulator.Elapsed);

@@ -12,4 +12,4 @@ internal sealed record NodeLeaseOutcome(
     NodeLeaseOutcomeKind Kind,
     int SourceId,
     int TargetId,
-    TimeSpan? TargetCrashTime = null);
+    TimeSpan? FailureStartedAt = null);

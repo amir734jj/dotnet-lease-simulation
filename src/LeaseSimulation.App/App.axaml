@@ -26,6 +26,9 @@
             <Setter Property="CornerRadius" Value="4" />
             <Setter Property="Padding" Value="14,9" />
         </Style>
+        <Style Selector="Button.compact">
+            <Setter Property="Padding" Value="8,7" />
+        </Style>
         <Style Selector="TextBlock.label">
             <Setter Property="FontSize" Value="11" />
             <Setter Property="Foreground" Value="#63706C" />

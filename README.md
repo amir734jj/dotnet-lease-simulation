@@ -38,6 +38,7 @@ dotnet test LeaseSimulation.slnx
 - Failed renewals never extend the existing TTL.
 - Expired leases enter arbitration before the target is confirmed down.
 - Confirmed failures update ring membership; recovered nodes rejoin immediately.
+- A network cut blocks cross-partition lease renewal. The side holding a strict majority of simulated voters survives arbitration; minority sides are fenced, and healing restarts partition-fenced nodes.
 - Events and detection latency are recorded for inspection.
 
 ## Architecture

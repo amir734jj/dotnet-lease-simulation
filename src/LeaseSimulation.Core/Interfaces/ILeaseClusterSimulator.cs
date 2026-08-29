@@ -11,8 +11,11 @@ public interface ILeaseClusterSimulator
     RingTopologySnapshot Topology { get; }
     IReadOnlyList<NodeSnapshot> Nodes { get; }
     IReadOnlyList<LeaseSnapshot> Leases { get; }
+    bool IsNetworkPartitioned { get; }
 
     void CrashNode(int nodeId);
     void RecoverNode(int nodeId);
+    void StartNetworkPartition(int splitAfterNodeId);
+    void HealNetworkPartition();
     void AdvanceBy(TimeSpan duration);
 }

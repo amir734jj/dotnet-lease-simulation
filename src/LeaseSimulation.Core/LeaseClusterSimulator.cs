@@ -17,6 +17,10 @@ public sealed class LeaseClusterSimulator : ILeaseClusterSimulator
     private readonly ReadOnlyCollection<SimulationEvent> eventView;
     private readonly ReadOnlyCollection<DetectionRecord> detectionView;
     private readonly HashSet<int> pendingRingRemovals = [];
+    private readonly HashSet<int> partitionFencedNodes = [];
+    private int? partitionAfterNodeId;
+    private TimeSpan? partitionStartedAt;
+    private TimeSpan? partitionResolutionAt;
     private int topologyVersion = 1;
 
     public LeaseClusterSimulator(LeaseSimulationOptions options)
@@ -36,6 +40,7 @@ public sealed class LeaseClusterSimulator : ILeaseClusterSimulator
     public IReadOnlyList<SimulationEvent> Events => eventView;
     public IReadOnlyList<DetectionRecord> Detections => detectionView;
     public RingTopologySnapshot Topology => CreateTopologySnapshot();
+    public bool IsNetworkPartitioned => partitionAfterNodeId is not null;
 
     public IReadOnlyList<NodeSnapshot> Nodes => nodes.Select(node => node.CreateSnapshot()).ToArray();
 
@@ -86,6 +91,58 @@ public sealed class LeaseClusterSimulator : ILeaseClusterSimulator
         events.Add(new(Elapsed, $"Node {nodeId:00} recovered; leases re-established", TargetId: nodeId));
     }
 
+    public void StartNetworkPartition(int splitAfterNodeId)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(splitAfterNodeId);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(splitAfterNodeId, nodes.Count - 1);
+        if (IsNetworkPartitioned)
+        {
+            return;
+        }
+
+        partitionAfterNodeId = splitAfterNodeId;
+        partitionStartedAt = Elapsed;
+        var firstCrossPartitionExpiry = nodes
+            .SelectMany(node => node.OutgoingLeases)
+            .Where(lease => !CanCommunicate(lease.SourceId, lease.TargetId))
+            .Select(lease => lease.ExpiresAt)
+            .DefaultIfEmpty(Elapsed + options.LeaseDuration)
+            .Min();
+        partitionResolutionAt = firstCrossPartitionExpiry +
+            (options.ArbitrationEnabled ? options.ArbitrationDuration : TimeSpan.Zero);
+
+        events.Add(new(Elapsed,
+            $"Network partition started: 00-{splitAfterNodeId:00} | {splitAfterNodeId + 1:00}-{nodes.Count - 1:00}"));
+    }
+
+    public void HealNetworkPartition()
+    {
+        if (!IsNetworkPartitioned)
+        {
+            return;
+        }
+
+        partitionAfterNodeId = null;
+        partitionStartedAt = null;
+        partitionResolutionAt = null;
+        foreach (var nodeId in partitionFencedNodes)
+        {
+            nodes[nodeId].Recover();
+            nodes[nodeId].JoinRing();
+            pendingRingRemovals.Remove(nodeId);
+        }
+
+        partitionFencedNodes.Clear();
+        topologyVersion++;
+        ReconcileRingNeighborhood();
+        foreach (var node in nodes.Where(node => node.IsRunning))
+        {
+            node.ResetAllLeases(Elapsed, options);
+        }
+
+        events.Add(new(Elapsed, $"Network partition healed; ring v{topologyVersion} restored"));
+    }
+
     /// <summary>
     /// Advances virtual time and processes every due transition in chronological order.
     /// </summary>
@@ -130,7 +187,9 @@ public sealed class LeaseClusterSimulator : ILeaseClusterSimulator
 
     private bool TryGetNextDueTime(TimeSpan target, out TimeSpan nextDue)
     {
-        nextDue = TimeSpan.MaxValue;
+        nextDue = partitionResolutionAt is not null && partitionResolutionAt <= target
+            ? partitionResolutionAt.Value
+            : TimeSpan.MaxValue;
         foreach (var due in nodes.Select(node => node.NextDueTime()))
         {
             if (due <= target && due < nextDue)
@@ -144,9 +203,15 @@ public sealed class LeaseClusterSimulator : ILeaseClusterSimulator
 
     private void ProcessDueTransitions()
     {
+        ResolveNetworkPartition();
         foreach (var node in nodes)
         {
-            foreach (var outcome in node.ProcessDueTransitions(Elapsed, options, GetNode))
+            foreach (var outcome in node.ProcessDueTransitions(
+                         Elapsed,
+                         options,
+                         GetNode,
+                         CanCommunicate,
+                         GetCommunicationFailureTime))
             {
                 RecordOutcome(outcome);
             }
@@ -171,8 +236,8 @@ public sealed class LeaseClusterSimulator : ILeaseClusterSimulator
                 detections.Add(new(
                     outcome.SourceId,
                     outcome.TargetId,
-                    outcome.TargetCrashTime ?? throw new InvalidOperationException(
-                        $"Node {outcome.TargetId} has no recorded crash time."),
+                    outcome.FailureStartedAt ?? throw new InvalidOperationException(
+                        $"Lease {outcome.SourceId}->{outcome.TargetId} has no failure start time."),
                     Elapsed,
                     null));
                 break;
@@ -232,6 +297,47 @@ public sealed class LeaseClusterSimulator : ILeaseClusterSimulator
 
     private string FormatRingMembers() =>
         string.Join(" -> ", Topology.MemberIds.Select(nodeId => nodeId.ToString("00")));
+
+    private void ResolveNetworkPartition()
+    {
+        if (partitionAfterNodeId is null || partitionResolutionAt is null || partitionResolutionAt > Elapsed)
+        {
+            return;
+        }
+
+        var split = partitionAfterNodeId.Value;
+        var quorum = nodes.Count / 2 + 1;
+        var leftHasQuorum = split + 1 >= quorum;
+        var rightHasQuorum = nodes.Count - split - 1 >= quorum;
+        foreach (var node in nodes.Where(node => node.IsRunning))
+        {
+            var isLeft = node.Id <= split;
+            if ((isLeft && leftHasQuorum) || (!isLeft && rightHasQuorum))
+            {
+                continue;
+            }
+
+            node.Crash(Elapsed);
+            partitionFencedNodes.Add(node.Id);
+            pendingRingRemovals.Add(node.Id);
+        }
+
+        var survivor = leftHasQuorum
+            ? $"00-{split:00}"
+            : rightHasQuorum
+                ? $"{split + 1:00}-{nodes.Count - 1:00}"
+                : "none";
+        events.Add(new(Elapsed,
+            $"Partition arbitration completed: quorum {quorum}/{nodes.Count}, surviving side {survivor}; {partitionFencedNodes.Count} nodes fenced"));
+        partitionResolutionAt = null;
+    }
+
+    private bool CanCommunicate(int sourceId, int targetId) =>
+        partitionAfterNodeId is null ||
+        (sourceId <= partitionAfterNodeId.Value) == (targetId <= partitionAfterNodeId.Value);
+
+    private TimeSpan? GetCommunicationFailureTime(int sourceId, int targetId) =>
+        CanCommunicate(sourceId, targetId) ? null : partitionStartedAt;
 
     private IFederationNodeActor GetNode(int nodeId)
     {

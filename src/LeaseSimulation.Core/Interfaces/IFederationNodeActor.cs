@@ -21,6 +21,8 @@ internal interface IFederationNodeActor
     IReadOnlyList<NodeLeaseOutcome> ProcessDueTransitions(
         TimeSpan now,
         LeaseSimulationOptions options,
-        Func<int, IFederationNodeActor> resolveNode);
+        Func<int, IFederationNodeActor> resolveNode,
+        Func<int, int, bool> canCommunicate,
+        Func<int, int, TimeSpan?> getCommunicationFailureTime);
     NodeSnapshot CreateSnapshot();
 }

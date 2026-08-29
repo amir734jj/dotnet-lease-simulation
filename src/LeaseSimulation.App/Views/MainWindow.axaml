@@ -33,10 +33,10 @@
             </Grid>
         </Border>
 
-        <Grid Grid.Row="1" ColumnDefinitions="270,*,340">
+        <Grid Grid.Row="1" ColumnDefinitions="270,*">
             <Border Grid.Column="0" Background="#E8ECE9" BorderBrush="#D3D9D6" BorderThickness="0,0,1,0" Padding="22">
                 <ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
-                    <StackPanel Spacing="14">
+                    <StackPanel Spacing="10">
                         <TextBlock Text="CONFIGURATION" FontSize="12" FontWeight="SemiBold" />
                         <TextBlock Classes="label" Text="Nodes" />
                         <NumericUpDown Value="{Binding NodeCount}" Minimum="3" Maximum="50" Increment="1" />
@@ -52,6 +52,11 @@
                         <CheckBox Content="Enable arbitration" IsChecked="{Binding ArbitrationEnabled}" />
                         <TextBlock Classes="label" Text="Arbitration duration (seconds)" />
                         <NumericUpDown Value="{Binding ArbitrationSeconds}" Minimum="0" Maximum="30" Increment="1" IsEnabled="{Binding ArbitrationEnabled}" />
+                        <TextBlock Classes="label" Text="Nodes in first partition" />
+                        <Grid ColumnDefinitions="105,*" ColumnSpacing="8">
+                            <NumericUpDown Value="{Binding FirstPartitionSize}" Minimum="1" Maximum="{Binding PartitionMaximum}" Increment="1" />
+                            <Button Grid.Column="1" Classes="secondary compact" Content="{Binding PartitionButtonText}" Command="{Binding TogglePartitionCommand}" HorizontalAlignment="Stretch" />
+                        </Grid>
                         <Grid ColumnDefinitions="*,Auto">
                             <TextBlock Classes="label" Text="Playback speed" />
                             <TextBlock Grid.Column="1" Text="{Binding SpeedText}" FontWeight="SemiBold" />
@@ -66,13 +71,15 @@
                 </ScrollViewer>
             </Border>
 
-            <Grid Grid.Column="1" RowDefinitions="*,Auto" Margin="24,18">
+            <Grid Grid.Column="1" RowDefinitions="*,Auto,190" Margin="24,18">
                 <Grid>
                     <controls:FederationRing Nodes="{Binding Nodes}" Leases="{Binding Leases}" Topology="{Binding Topology}"
-                                             ToggleNodeCommand="{Binding ToggleNodeCommand}" MinHeight="400" />
-                    <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" IsHitTestVisible="False" MaxWidth="360">
+                                             ToggleNodeCommand="{Binding ToggleNodeCommand}" MinHeight="260" />
+                    <StackPanel HorizontalAlignment="Stretch" VerticalAlignment="Top" IsHitTestVisible="False">
                         <TextBlock Text="{Binding TopologyText}" FontSize="12" FontWeight="SemiBold" Foreground="#087E68" />
-                        <TextBlock Text="{Binding RingPathText}" FontFamily="Consolas" FontSize="10" Foreground="#63706C" TextWrapping="Wrap" />
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                            <TextBlock Text="{Binding RingPathText}" FontFamily="Consolas" FontSize="10" Foreground="#63706C" TextWrapping="NoWrap" />
+                        </ScrollViewer>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom" Spacing="12" IsHitTestVisible="False">
                         <StackPanel Orientation="Horizontal" Spacing="5">
@@ -108,31 +115,23 @@
                         </StackPanel>
                     </Border>
                 </Grid>
-            </Grid>
-
-            <Border Grid.Column="2" Background="White" BorderBrush="#D3D9D6" BorderThickness="1,0,0,0" Padding="20">
+                <Border Grid.Row="2" Background="White" BorderBrush="#D3D9D6" BorderThickness="1" CornerRadius="5" Padding="16" Margin="0,10,0,0">
                 <Grid RowDefinitions="Auto,*">
-                    <StackPanel Margin="0,0,0,12">
+                    <StackPanel Margin="0,0,0,8">
                         <TextBlock Text="LEASE EVENTS" FontSize="12" FontWeight="SemiBold" />
                         <TextBlock Classes="label" Text="Newest first" />
                     </StackPanel>
-                    <ListBox Grid.Row="1" ItemsSource="{Binding EventRows}" BorderThickness="0" Background="Transparent">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate x:DataType="vm:EventRow">
-                                <Grid ColumnDefinitions="58,*" Margin="0,4" ColumnSpacing="8">
-                                    <TextBlock Text="{Binding Time}" FontFamily="Consolas" FontSize="11" Foreground="#7B8783" />
-                                    <TextBlock Grid.Column="1" Text="{Binding Message}" TextWrapping="Wrap" FontSize="12" />
-                                </Grid>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
+                    <TextBox Grid.Row="1" Text="{Binding EventLogText}" IsReadOnly="True" AcceptsReturn="True"
+                             TextWrapping="Wrap" FontFamily="Consolas" FontSize="11" Padding="0"
+                             BorderThickness="0" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Auto" />
                 </Grid>
-            </Border>
+                </Border>
+            </Grid>
         </Grid>
 
         <Border Grid.Row="2" Background="#DDE3E0" Padding="22,8">
             <TextBlock FontSize="10" Foreground="#5E6B67"
-                       Text="MODEL  Directed source-to-target leases | Ring neighborhood | Fixed TTL on failed renewals | Optional arbitration" />
+                       Text="MODEL  Directed leases | Ring neighborhood | Fixed TTL | Voter-quorum partition arbitration" />
         </Border>
     </Grid>
 
