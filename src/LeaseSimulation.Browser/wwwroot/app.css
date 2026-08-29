@@ -1,0 +1,21 @@
+html,
+body,
+#out {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+}
+
+body {
+    background: #f3f5f3;
+}
+
+.splash {
+    display: grid;
+    width: 100%;
+    height: 100%;
+    place-items: center;
+    color: #087e68;
+    font: 600 16px sans-serif;
+}

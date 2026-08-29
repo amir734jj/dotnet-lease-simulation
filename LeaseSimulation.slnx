@@ -1,0 +1,16 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/src/">
+    <Project Path="src/LeaseSimulation.App/LeaseSimulation.App.csproj" />
+    <Project Path="src/LeaseSimulation.Browser/LeaseSimulation.Browser.csproj" />
+    <Project Path="src/LeaseSimulation.Core/LeaseSimulation.Core.csproj" />
+    <Project Path="src/LeaseSimulation.Desktop/LeaseSimulation.Desktop.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/LeaseSimulation.Tests/LeaseSimulation.Tests.csproj" />
+  </Folder>
+</Solution>

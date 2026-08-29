@@ -1,0 +1,139 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LeaseSimulation.App.ViewModels"
+        xmlns:controls="using:LeaseSimulation.App.Controls"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="800"
+        x:Class="LeaseSimulation.App.Views.MainView"
+        x:DataType="vm:MainViewModel"
+        Background="#F3F5F3">
+
+    <Design.DataContext>
+        <vm:MainViewModel />
+    </Design.DataContext>
+
+    <Grid RowDefinitions="Auto,*,Auto">
+        <Border Grid.Row="0" Background="#17201E" Padding="24,18">
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="30">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="WINDOWS FABRIC" Foreground="#78D8C2" FontSize="11" FontWeight="SemiBold" />
+                    <TextBlock Text="Lease Lab" Foreground="White" FontSize="25" FontWeight="SemiBold" />
+                </StackPanel>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="SIMULATION TIME" Foreground="#93A09C" FontSize="10" />
+                    <TextBlock Text="{Binding ElapsedText}" Foreground="White" FontSize="20" />
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                    <TextBlock Text="NODES RUNNING" Foreground="#93A09C" FontSize="10" />
+                    <TextBlock Text="{Binding RunningText}" Foreground="White" FontSize="20" />
+                </StackPanel>
+                <Button Grid.Column="3" Classes="primary" Content="{Binding RunButtonText}" Command="{Binding ToggleRunCommand}" Background="#087E68" />
+                <Button Grid.Column="4" Classes="secondary" Content="Step +1s" Command="{Binding StepCommand}" />
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1" ColumnDefinitions="270,*,340">
+            <Border Grid.Column="0" Background="#E8ECE9" BorderBrush="#D3D9D6" BorderThickness="0,0,1,0" Padding="22">
+                <ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="14">
+                        <TextBlock Text="CONFIGURATION" FontSize="12" FontWeight="SemiBold" />
+                        <TextBlock Classes="label" Text="Nodes" />
+                        <NumericUpDown Value="{Binding NodeCount}" Minimum="3" Maximum="50" Increment="1" />
+                        <TextBlock Classes="label" Text="Neighbors in each ring direction" />
+                        <NumericUpDown Value="{Binding NeighborhoodSize}" Minimum="1" Maximum="8" Increment="1" />
+                        <TextBlock Classes="label" Text="Lease duration (seconds)" />
+                        <NumericUpDown Value="{Binding LeaseSeconds}" Minimum="2" Maximum="120" Increment="1" />
+                        <TextBlock Classes="label" Text="Renew begin ratio" />
+                        <NumericUpDown Value="{Binding RenewRatio}" Minimum="2" Maximum="12" Increment="1" />
+                        <TextBlock Text="{Binding RenewStartsAt, StringFormat='First renewal at {0:0.0}s'}" FontSize="11" Foreground="#087E68" />
+                        <TextBlock Classes="label" Text="Renew attempts per lease" />
+                        <NumericUpDown Value="{Binding RetryCount}" Minimum="1" Maximum="10" Increment="1" />
+                        <CheckBox Content="Enable arbitration" IsChecked="{Binding ArbitrationEnabled}" />
+                        <TextBlock Classes="label" Text="Arbitration duration (seconds)" />
+                        <NumericUpDown Value="{Binding ArbitrationSeconds}" Minimum="0" Maximum="30" Increment="1" IsEnabled="{Binding ArbitrationEnabled}" />
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="label" Text="Playback speed" />
+                            <TextBlock Grid.Column="1" Text="{Binding SpeedText}" FontWeight="SemiBold" />
+                        </Grid>
+                        <Slider Minimum="1" Maximum="50" Value="{Binding Speed}" TickFrequency="1" />
+                        <Button Classes="primary" Content="Apply and reset" Command="{Binding ResetCommand}" HorizontalAlignment="Stretch" />
+                        <Border Background="#DDE3E0" CornerRadius="4" Padding="12" Margin="0,8,0,0">
+                            <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#52605C"
+                                       Text="Fabric defaults: 30s lease, renewal at 1/6, 3 attempts, and 4 neighbors per direction. Click a node to crash or recover it." />
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <Grid Grid.Column="1" RowDefinitions="*,Auto" Margin="24,18">
+                <Grid>
+                    <controls:FederationRing Nodes="{Binding Nodes}" Leases="{Binding Leases}" Topology="{Binding Topology}"
+                                             ToggleNodeCommand="{Binding ToggleNodeCommand}" MinHeight="400" />
+                    <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" IsHitTestVisible="False" MaxWidth="360">
+                        <TextBlock Text="{Binding TopologyText}" FontSize="12" FontWeight="SemiBold" Foreground="#087E68" />
+                        <TextBlock Text="{Binding RingPathText}" FontFamily="Consolas" FontSize="10" Foreground="#63706C" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom" Spacing="12" IsHitTestVisible="False">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <Border Width="18" Height="3" Background="#69AFA0" VerticalAlignment="Center" />
+                            <TextBlock Text="active ring" FontSize="10" Foreground="#63706C" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <Border Width="18" Height="3" Background="#D79A20" VerticalAlignment="Center" />
+                            <TextBlock Text="awaiting detection" FontSize="10" Foreground="#63706C" />
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+                <Grid Grid.Row="1" ColumnDefinitions="*,*,*" ColumnSpacing="12" Margin="0,10,0,0">
+                    <Border Background="White" BorderBrush="#D8DDDA" BorderThickness="1" CornerRadius="5" Padding="14">
+                        <StackPanel>
+                            <TextBlock Classes="label" Text="TTL EXPIRATIONS" />
+                            <TextBlock Classes="metric" Text="{Binding SuspectedText}" />
+                            <TextBlock Text="suspected" FontSize="11" Foreground="#D0931C" />
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="1" Background="White" BorderBrush="#D8DDDA" BorderThickness="1" CornerRadius="5" Padding="14">
+                        <StackPanel>
+                            <TextBlock Classes="label" Text="DOWN REPORTS" />
+                            <TextBlock Classes="metric" Text="{Binding ConfirmedText}" />
+                            <TextBlock Text="confirmed" FontSize="11" Foreground="#D94B45" />
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="2" Background="White" BorderBrush="#D8DDDA" BorderThickness="1" CornerRadius="5" Padding="14">
+                        <StackPanel>
+                            <TextBlock Classes="label" Text="AVG. DETECTION" />
+                            <TextBlock Classes="metric" Text="{Binding AverageDetectionText}" />
+                            <TextBlock Text="crash to confirmation" FontSize="11" Foreground="#087E68" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Grid>
+
+            <Border Grid.Column="2" Background="White" BorderBrush="#D3D9D6" BorderThickness="1,0,0,0" Padding="20">
+                <Grid RowDefinitions="Auto,*">
+                    <StackPanel Margin="0,0,0,12">
+                        <TextBlock Text="LEASE EVENTS" FontSize="12" FontWeight="SemiBold" />
+                        <TextBlock Classes="label" Text="Newest first" />
+                    </StackPanel>
+                    <ListBox Grid.Row="1" ItemsSource="{Binding EventRows}" BorderThickness="0" Background="Transparent">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:EventRow">
+                                <Grid ColumnDefinitions="58,*" Margin="0,4" ColumnSpacing="8">
+                                    <TextBlock Text="{Binding Time}" FontFamily="Consolas" FontSize="11" Foreground="#7B8783" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Message}" TextWrapping="Wrap" FontSize="12" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="2" Background="#DDE3E0" Padding="22,8">
+            <TextBlock FontSize="10" Foreground="#5E6B67"
+                       Text="MODEL  Directed source-to-target leases | Ring neighborhood | Fixed TTL on failed renewals | Optional arbitration" />
+        </Border>
+    </Grid>
+
+</UserControl>
