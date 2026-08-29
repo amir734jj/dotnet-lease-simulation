@@ -12,5 +12,5 @@ RUN dotnet workload restore LeaseSimulation.slnx \
 FROM node:24-alpine AS final
 RUN npm install --global http-server
 COPY --from=build /app/publish/wwwroot /var/www
-EXPOSE 80
-ENTRYPOINT ["http-server", "/var/www", "--port", "80", "--cache", "-1"]
+EXPOSE 3000
+ENTRYPOINT ["http-server", "/var/www", "--port", "3000", "--cache", "-1"]
