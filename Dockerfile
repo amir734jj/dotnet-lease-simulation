@@ -1,4 +1,6 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
+RUN apk add --no-cache python3 \
+    && ln -s /usr/bin/python3 /usr/bin/python
 WORKDIR /src
 COPY . .
 RUN dotnet workload restore LeaseSimulation.slnx \
